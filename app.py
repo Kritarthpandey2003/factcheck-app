@@ -19,6 +19,19 @@ with st.sidebar:
     if not api_key:
         api_key = os.getenv("GEMINI_API_KEY") # Fallback to environment variable
 
+def get_model_name():
+    try:
+        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        for m in models:
+            if 'flash' in m.lower():
+                return m
+        for m in models:
+            if 'pro' in m.lower():
+                return m
+        return models[0] if models else 'gemini-pro'
+    except Exception:
+        return 'gemini-pro'
+
 def extract_text_from_pdf(pdf_file):
     reader = PyPDF2.PdfReader(pdf_file)
     text = ""
@@ -29,8 +42,8 @@ def extract_text_from_pdf(pdf_file):
 
 def extract_claims(text, api_key):
     genai.configure(api_key=api_key)
-    # Using gemini-pro for stability across all API versions
-    model = genai.GenerativeModel('gemini-pro')
+    model_name = get_model_name()
+    model = genai.GenerativeModel(model_name)
     
     prompt = f"""
     You are an expert fact-checker. Read the following text and extract all specific, verifiable claims.
@@ -79,7 +92,8 @@ def verify_claim(claim, api_key):
     search_context = search_web(claim)
     
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-pro')
+    model_name = get_model_name()
+    model = genai.GenerativeModel(model_name)
     
     prompt = f"""
     You are an expert fact-checker. 
