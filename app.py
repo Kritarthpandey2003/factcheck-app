@@ -28,7 +28,8 @@ def extract_text_from_pdf(pdf_file):
     return text
 
 def extract_claims(text, api_key):
-    genai.configure(api_key=api_key)
+    api_key = api_key.strip()
+    genai.configure(api_key=api_key, transport='rest')
     
     prompt = f"""
     You are an expert fact-checker. Read the following text and extract all specific, verifiable claims.
@@ -82,7 +83,8 @@ def verify_claim(claim, api_key):
     # Search the web based on the claim
     search_context = search_web(claim)
     
-    genai.configure(api_key=api_key)
+    api_key = api_key.strip()
+    genai.configure(api_key=api_key, transport='rest')
     
     prompt = f"""
     You are an expert fact-checker. 
