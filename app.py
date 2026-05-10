@@ -16,6 +16,18 @@ with st.sidebar:
     st.header("⚙️ Configuration")
     api_key = st.text_input("Enter your Google Gemini API Key:", type="password")
     st.markdown("[Get an API key here](https://aistudio.google.com/app/apikey)")
+    if st.button("📋 List My Available Models"):
+        if api_key:
+            r = requests.get(f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key.strip()}")
+            if r.status_code == 200:
+                models = [m['name'] for m in r.json().get('models', []) if 'generateContent' in m.get('supportedGenerationMethods', [])]
+                st.success("Your models:")
+                for m in models:
+                    st.code(m)
+            else:
+                st.error(f"Error: {r.text}")
+        else:
+            st.warning("Enter API key first!")
 
 def call_gemini_api(prompt, api_key):
     api_key = api_key.strip()
