@@ -33,7 +33,7 @@ def call_gemini_api(prompt, api_key):
     api_key = api_key.strip()
     last_res = "No models reached."
     for version in ["v1beta"]:
-        for model in ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-2.0-flash-exp", "gemini-1.5-flash", "gemini-1.5-pro"]:
+        for model in ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-2.0-flash-lite"]:
             url = f"https://generativelanguage.googleapis.com/{version}/models/{model}:generateContent?key={api_key}"
             headers = {'Content-Type': 'application/json'}
             payload = {"contents": [{"parts": [{"text": prompt}]}]}
