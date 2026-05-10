@@ -45,6 +45,7 @@ def extract_claims(text, api_key):
     """
     
     # Try multiple models in case of 404 errors
+    errors = []
     for model_name in ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro", "gemini-1.0-pro"]:
         try:
             model = genai.GenerativeModel(model_name)
@@ -61,9 +62,10 @@ def extract_claims(text, api_key):
             claims = json.loads(res_text.strip())
             return claims
         except Exception as e:
+            errors.append(f"{model_name}: {str(e)}")
             continue # Try next model
             
-    st.error("Could not find a compatible Gemini model for your API key. Please try a different key or wait a few minutes.")
+    st.error(f"Could not find a compatible Gemini model. Details: {' | '.join(errors)}")
     return []
 
 def search_web(query):
