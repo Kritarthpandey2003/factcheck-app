@@ -19,7 +19,7 @@ with st.sidebar:
     selected_model = st.selectbox("Select Model:", ["gemini-1.5-flash", "gemini-1.5-pro"])
 
 def call_gemini_api(prompt, api_key):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{selected_model}:generateContent?key={api_key.strip()}"
+    url = f"https://generativelanguage.googleapis.com/v1/models/{selected_model}:generateContent?key={api_key.strip()}"
     headers = {'Content-Type': 'application/json'}
     payload = {
         "contents": [{
