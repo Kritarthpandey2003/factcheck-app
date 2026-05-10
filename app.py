@@ -16,8 +16,10 @@ with st.sidebar:
     st.header("⚙️ Configuration")
     api_key = st.text_input("Enter your Google Gemini API Key:", type="password")
     st.markdown("[Get an API key here](https://aistudio.google.com/app/apikey)")
+    selected_model = st.selectbox("Select Gemini Model (Try 'gemini-1.5-flash' first):", 
+                                ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro", "gemini-1.0-pro"])
     if not api_key:
-        api_key = os.getenv("GEMINI_API_KEY") # Fallback to environment variable
+        api_key = os.getenv("GEMINI_API_KEY")
 
 def extract_text_from_pdf(pdf_file):
     reader = PyPDF2.PdfReader(pdf_file)
@@ -33,170 +35,83 @@ def extract_claims(text, api_key):
     
     prompt = f"""
     You are an expert fact-checker. Read the following text and extract all specific, verifiable claims.
-    Focus on:
-    1. Statistics and percentages
-    2. Dates and historical events
-    3. Financial and technical figures
-    
-    Return the output EXACTLY as a valid JSON array of strings. Do not include any markdown formatting or code blocks.
-    Example: ["Claim 1", "Claim 2"]
-    
-    Text:
-    {text}
+    Focus on: 1. Statistics 2. Dates 3. Financial figures.
+    Return output EXACTLY as a valid JSON array of strings.
+    Text: {text}
     """
-    
-    # Try modern models first
-    for model_name in ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]:
-        try:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(prompt)
-            res_text = response.text.strip()
-            # Clean up potential markdown formatting
-            if res_text.startswith("```json"):
-                res_text = res_text[7:]
-            if res_text.startswith("```"):
-                res_text = res_text[3:]
-            if res_text.endswith("```"):
-                res_text = res_text[:-3]
-                
-            claims = json.loads(res_text.strip())
-            return claims
-        except Exception as e:
-            continue # Try next model
-            
-    st.error("The Gemini API is currently unavailable or your key is still activating. Please wait 1 minute and try again.")
-    return []
+    try:
+        model = genai.GenerativeModel(selected_model)
+        response = model.generate_content(prompt)
+        res_text = response.text.strip()
+        if "```json" in res_text: res_text = res_text.split("```json")[1].split("```")[0]
+        elif "```" in res_text: res_text = res_text.split("```")[1].split("```")[0]
+        return json.loads(res_text.strip())
+    except Exception as e:
+        st.error(f"Error during claim extraction: {e}")
+        return []
 
 def search_web(query):
     results_text = ""
     try:
         with DDGS() as ddgs:
-            # Get top 3 results
             results = list(ddgs.text(query, max_results=3))
             for res in results:
                 results_text += f"Source: {res['title']}\nSnippet: {res['body']}\n\n"
-    except Exception as e:
+    except:
         results_text = "Could not fetch live search results."
     return results_text
 
 def verify_claim(claim, api_key):
-    # Search the web based on the claim
     search_context = search_web(claim)
-    
     api_key = api_key.strip()
     genai.configure(api_key=api_key, transport='rest')
     
     prompt = f"""
-    You are an expert fact-checker. 
-    Evaluate the following claim based ONLY on the provided search results from the live web.
-    
-    Claim to verify: "{claim}"
-    
-    Web Search Results:
-    {search_context}
-    
-    You must classify the claim into exactly one of these categories:
-    - Verified (Matches data found)
-    - Inaccurate (Matches partially, but outdated or slightly wrong)
-    - False (Contradicts data found or no evidence exists)
-    
-    Return the result EXACTLY as a JSON object with three keys:
-    "status": "Verified" or "Inaccurate" or "False",
-    "explanation": "A short explanation of why",
-    "real_fact": "The actual truth based on the search results"
-    
-    Do not include markdown code blocks.
+    Verify this claim based ONLY on these search results: "{claim}"
+    Results: {search_context}
+    Return JSON: {{"status": "Verified/Inaccurate/False", "explanation": "...", "real_fact": "..."}}
     """
-    
-    # Try multiple models in case of 404 errors
-    for model_name in ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]:
-        try:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(prompt)
-            res_text = response.text.strip()
-            if res_text.startswith("```json"):
-                res_text = res_text[7:]
-            if res_text.startswith("```"):
-                res_text = res_text[3:]
-            if res_text.endswith("```"):
-                res_text = res_text[:-3]
-                
-            verification = json.loads(res_text.strip())
-            return verification
-        except Exception:
-            continue
-            
-    return {"status": "Error", "explanation": "No compatible Gemini model found.", "real_fact": "N/A"}
-
+    try:
+        model = genai.GenerativeModel(selected_model)
+        response = model.generate_content(prompt)
+        res_text = response.text.strip()
+        if "```json" in res_text: res_text = res_text.split("```json")[1].split("```")[0]
+        elif "```" in res_text: res_text = res_text.split("```")[1].split("```")[0]
+        return json.loads(res_text.strip())
+    except Exception as e:
+        return {"status": "Error", "explanation": str(e), "real_fact": "N/A"}
 
 uploaded_file = st.file_uploader("Upload a PDF document to verify", type=["pdf"])
 
 if uploaded_file is not None:
     if not api_key:
-        st.warning("⚠️ Please enter your Gemini API Key in the sidebar to proceed.")
+        st.warning("⚠️ Please enter your Gemini API Key in the sidebar.")
     else:
         if st.button("Start Fact-Checking", type="primary"):
-            with st.spinner("Extracting text from PDF..."):
-                doc_text = extract_text_from_pdf(uploaded_file)
-            
+            doc_text = extract_text_from_pdf(uploaded_file)
             if not doc_text.strip():
-                st.error("Could not extract any text from the uploaded PDF.")
+                st.error("Could not extract text.")
             else:
-                with st.spinner("Analyzing text and extracting claims via Gemini..."):
-                    claims = extract_claims(doc_text, api_key)
-                
+                claims = extract_claims(doc_text, api_key)
                 if not claims:
-                    st.info("No verifiable claims (stats, dates, figures) were found in this document.")
+                    st.info("No claims found or API error.")
                 else:
-                    st.success(f"Extracted {len(claims)} verifiable claims. Starting live web verification...")
-                    
+                    st.success(f"Extracted {len(claims)} claims. Verifying...")
                     st.markdown("### 📊 Fact-Check Summary")
                     col1, col2, col3, col4 = st.columns(4)
-                    metric_total = col1.empty()
-                    metric_verified = col2.empty()
-                    metric_inaccurate = col3.empty()
-                    metric_false = col4.empty()
-                    
-                    metric_total.metric("Total Claims", len(claims))
-                    metric_verified.metric("✅ Verified", 0)
-                    metric_inaccurate.metric("⚠️ Inaccurate", 0)
-                    metric_false.metric("❌ False", 0)
-                    
-                    v_count = 0
-                    i_count = 0
-                    f_count = 0
-                    
+                    m_total = col1.empty(); m_v = col2.empty(); m_i = col3.empty(); m_f = col4.empty()
+                    m_total.metric("Total", len(claims)); m_v.metric("✅ Verified", 0); m_i.metric("⚠️ Inaccurate", 0); m_f.metric("❌ False", 0)
+                    v_c = 0; i_c = 0; f_c = 0
                     st.markdown("### 🔍 Detailed Analysis")
-                    # Display results in an expander for each claim
                     for i, claim in enumerate(claims):
-                        with st.status(f"Verifying Claim {i+1}: {claim[:50]}...", expanded=False) as status:
-                            st.write(f"**Original Claim:** {claim}")
-                            st.write("🔍 Searching the live web...")
-                            
-                            # Add a small sleep to avoid rate limits on DuckDuckGo
-                            time.sleep(1) 
-                            
-                            verification = verify_claim(claim, api_key)
-                            
-                            status_val = verification.get("status", "Error")
-                            if status_val == "Verified":
-                                st.success(f"✅ Status: {status_val}")
-                                status.update(label=f"✅ {claim[:50]}...", state="complete")
-                                v_count += 1
-                                metric_verified.metric("✅ Verified", v_count)
-                            elif status_val == "Inaccurate":
-                                st.warning(f"⚠️ Status: {status_val}")
-                                status.update(label=f"⚠️ {claim[:50]}...", state="complete")
-                                i_count += 1
-                                metric_inaccurate.metric("⚠️ Inaccurate", i_count)
-                            elif status_val == "False":
-                                st.error(f"❌ Status: {status_val}")
-                                status.update(label=f"❌ {claim[:50]}...", state="complete")
-                                f_count += 1
-                                metric_false.metric("❌ False", f_count)
-                            else:
-                                st.info(f"❓ Status: {status_val}")
-                                status.update(label=f"❓ {claim[:50]}...", state="complete")
-                                
-                            st.write(f"**Explanation:** {verification.get('explanation', 'N/A')}")
-                            st.write(f"**The Real Fact:** {verification.get('real_fact', 'N/A')}")
+                        with st.status(f"Verifying {i+1}...", expanded=False) as status:
+                            st.write(f"**Claim:** {claim}")
+                            time.sleep(1)
+                            res = verify_claim(claim, api_key)
+                            s = res.get("status", "Error")
+                            if s == "Verified": v_c += 1; m_v.metric("✅ Verified", v_c); st.success("✅ Verified")
+                            elif s == "Inaccurate": i_c += 1; m_i.metric("⚠️ Inaccurate", i_c); st.warning("⚠️ Inaccurate")
+                            elif s == "False": f_c += 1; m_f.metric("❌ False", f_c); st.error("❌ False")
+                            st.write(f"**Explanation:** {res.get('explanation')}")
+                            st.write(f"**Real Fact:** {res.get('real_fact')}")
+                            status.update(label=f"Done: {claim[:30]}...", state="complete")
