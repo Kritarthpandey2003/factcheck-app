@@ -20,6 +20,18 @@ with st.sidebar:
                                 ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro", "gemini-1.0-pro"])
     if not api_key:
         api_key = os.getenv("GEMINI_API_KEY")
+    
+    if st.button("🔍 Debug: List Available Models"):
+        if not api_key:
+            st.error("Please enter an API key first.")
+        else:
+            try:
+                genai.configure(api_key=api_key.strip(), transport='rest')
+                models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                st.write("Your available models:")
+                st.write(models)
+            except Exception as e:
+                st.error(f"Error listing models: {e}")
 
 def extract_text_from_pdf(pdf_file):
     reader = PyPDF2.PdfReader(pdf_file)
