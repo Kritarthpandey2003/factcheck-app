@@ -4,6 +4,7 @@ import requests
 from duckduckgo_search import DDGS
 import json
 import os
+import time
 
 st.set_page_config(page_title="Fact-Check Agent", page_icon="🔍", layout="wide")
 
@@ -25,14 +26,17 @@ def call_gemini_api(prompt, api_key):
             headers = {'Content-Type': 'application/json'}
             payload = {"contents": [{"parts": [{"text": prompt}]}]}
             try:
-                response = requests.post(url, headers=headers, json=payload, timeout=10)
+                response = requests.post(url, headers=headers, json=payload, timeout=30)
                 if response.status_code == 200:
                     res_json = response.json()
                     res_text = res_json['candidates'][0]['content']['parts'][0]['text']
                     if "```json" in res_text: res_text = res_text.split("```json")[1].split("```")[0]
                     elif "```" in res_text: res_text = res_text.split("```")[1].split("```")[0]
                     return res_text.strip()
+                else:
+                    time.sleep(1) # Small delay before retry
             except:
+                time.sleep(1)
                 continue
     return None
 
