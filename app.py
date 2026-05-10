@@ -44,9 +44,8 @@ def extract_claims(text, api_key):
     {text}
     """
     
-    # Try multiple models in case of 404 errors
-    errors = []
-    for model_name in ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro", "gemini-1.0-pro"]:
+    # Try modern models first
+    for model_name in ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]:
         try:
             model = genai.GenerativeModel(model_name)
             response = model.generate_content(prompt)
@@ -62,10 +61,9 @@ def extract_claims(text, api_key):
             claims = json.loads(res_text.strip())
             return claims
         except Exception as e:
-            errors.append(f"{model_name}: {str(e)}")
             continue # Try next model
             
-    st.error(f"Could not find a compatible Gemini model. Details: {' | '.join(errors)}")
+    st.error("The Gemini API is currently unavailable or your key is still activating. Please wait 1 minute and try again.")
     return []
 
 def search_web(query):
@@ -109,7 +107,7 @@ def verify_claim(claim, api_key):
     """
     
     # Try multiple models in case of 404 errors
-    for model_name in ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro", "gemini-1.0-pro"]:
+    for model_name in ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]:
         try:
             model = genai.GenerativeModel(model_name)
             response = model.generate_content(prompt)
