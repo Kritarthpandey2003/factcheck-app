@@ -19,19 +19,6 @@ with st.sidebar:
     if not api_key:
         api_key = os.getenv("GEMINI_API_KEY") # Fallback to environment variable
 
-def get_model_name():
-    try:
-        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        for m in models:
-            if 'flash' in m.lower():
-                return m
-        for m in models:
-            if 'pro' in m.lower():
-                return m
-        return models[0] if models else 'gemini-pro'
-    except Exception:
-        return 'gemini-pro'
-
 def extract_text_from_pdf(pdf_file):
     reader = PyPDF2.PdfReader(pdf_file)
     text = ""
@@ -42,8 +29,6 @@ def extract_text_from_pdf(pdf_file):
 
 def extract_claims(text, api_key):
     genai.configure(api_key=api_key)
-    model_name = get_model_name()
-    model = genai.GenerativeModel(model_name)
     
     prompt = f"""
     You are an expert fact-checker. Read the following text and extract all specific, verifiable claims.
@@ -58,22 +43,28 @@ def extract_claims(text, api_key):
     Text:
     {text}
     """
-    try:
-        response = model.generate_content(prompt)
-        # Clean up potential markdown formatting
-        res_text = response.text.strip()
-        if res_text.startswith("```json"):
-            res_text = res_text[7:]
-        if res_text.startswith("```"):
-            res_text = res_text[3:]
-        if res_text.endswith("```"):
-            res_text = res_text[:-3]
+    
+    # Try multiple models in case of 404 errors
+    for model_name in ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro", "gemini-1.0-pro"]:
+        try:
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(prompt)
+            res_text = response.text.strip()
+            # Clean up potential markdown formatting
+            if res_text.startswith("```json"):
+                res_text = res_text[7:]
+            if res_text.startswith("```"):
+                res_text = res_text[3:]
+            if res_text.endswith("```"):
+                res_text = res_text[:-3]
+                
+            claims = json.loads(res_text.strip())
+            return claims
+        except Exception as e:
+            continue # Try next model
             
-        claims = json.loads(res_text.strip())
-        return claims
-    except Exception as e:
-        st.error(f"Error extracting claims: {e}")
-        return []
+    st.error("Could not find a compatible Gemini model for your API key. Please try a different key or wait a few minutes.")
+    return []
 
 def search_web(query):
     results_text = ""
@@ -92,8 +83,6 @@ def verify_claim(claim, api_key):
     search_context = search_web(claim)
     
     genai.configure(api_key=api_key)
-    model_name = get_model_name()
-    model = genai.GenerativeModel(model_name)
     
     prompt = f"""
     You are an expert fact-checker. 
@@ -117,20 +106,25 @@ def verify_claim(claim, api_key):
     Do not include markdown code blocks.
     """
     
-    try:
-        response = model.generate_content(prompt)
-        res_text = response.text.strip()
-        if res_text.startswith("```json"):
-            res_text = res_text[7:]
-        if res_text.startswith("```"):
-            res_text = res_text[3:]
-        if res_text.endswith("```"):
-            res_text = res_text[:-3]
+    # Try multiple models in case of 404 errors
+    for model_name in ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro", "gemini-1.0-pro"]:
+        try:
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(prompt)
+            res_text = response.text.strip()
+            if res_text.startswith("```json"):
+                res_text = res_text[7:]
+            if res_text.startswith("```"):
+                res_text = res_text[3:]
+            if res_text.endswith("```"):
+                res_text = res_text[:-3]
+                
+            verification = json.loads(res_text.strip())
+            return verification
+        except Exception:
+            continue
             
-        verification = json.loads(res_text.strip())
-        return verification
-    except Exception as e:
-        return {"status": "Error", "explanation": str(e), "real_fact": "N/A"}
+    return {"status": "Error", "explanation": "No compatible Gemini model found.", "real_fact": "N/A"}
 
 
 uploaded_file = st.file_uploader("Upload a PDF document to verify", type=["pdf"])
