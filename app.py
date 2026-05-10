@@ -29,8 +29,8 @@ def extract_text_from_pdf(pdf_file):
 
 def extract_claims(text, api_key):
     genai.configure(api_key=api_key)
-    # Using gemini-1.5-flash for speed
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # Using gemini-pro for stability across all API versions
+    model = genai.GenerativeModel('gemini-pro')
     
     prompt = f"""
     You are an expert fact-checker. Read the following text and extract all specific, verifiable claims.
@@ -79,7 +79,7 @@ def verify_claim(claim, api_key):
     search_context = search_web(claim)
     
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-pro')
     
     prompt = f"""
     You are an expert fact-checker. 
