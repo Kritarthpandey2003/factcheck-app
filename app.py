@@ -154,6 +154,23 @@ if uploaded_file is not None:
                 else:
                     st.success(f"Extracted {len(claims)} verifiable claims. Starting live web verification...")
                     
+                    st.markdown("### 📊 Fact-Check Summary")
+                    col1, col2, col3, col4 = st.columns(4)
+                    metric_total = col1.empty()
+                    metric_verified = col2.empty()
+                    metric_inaccurate = col3.empty()
+                    metric_false = col4.empty()
+                    
+                    metric_total.metric("Total Claims", len(claims))
+                    metric_verified.metric("✅ Verified", 0)
+                    metric_inaccurate.metric("⚠️ Inaccurate", 0)
+                    metric_false.metric("❌ False", 0)
+                    
+                    v_count = 0
+                    i_count = 0
+                    f_count = 0
+                    
+                    st.markdown("### 🔍 Detailed Analysis")
                     # Display results in an expander for each claim
                     for i, claim in enumerate(claims):
                         with st.status(f"Verifying Claim {i+1}: {claim[:50]}...", expanded=False) as status:
@@ -169,12 +186,18 @@ if uploaded_file is not None:
                             if status_val == "Verified":
                                 st.success(f"✅ Status: {status_val}")
                                 status.update(label=f"✅ {claim[:50]}...", state="complete")
+                                v_count += 1
+                                metric_verified.metric("✅ Verified", v_count)
                             elif status_val == "Inaccurate":
                                 st.warning(f"⚠️ Status: {status_val}")
                                 status.update(label=f"⚠️ {claim[:50]}...", state="complete")
+                                i_count += 1
+                                metric_inaccurate.metric("⚠️ Inaccurate", i_count)
                             elif status_val == "False":
                                 st.error(f"❌ Status: {status_val}")
                                 status.update(label=f"❌ {claim[:50]}...", state="complete")
+                                f_count += 1
+                                metric_false.metric("❌ False", f_count)
                             else:
                                 st.info(f"❓ Status: {status_val}")
                                 status.update(label=f"❓ {claim[:50]}...", state="complete")
