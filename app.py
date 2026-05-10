@@ -19,7 +19,7 @@ with st.sidebar:
 
 def call_gemini_api(prompt, api_key):
     api_key = api_key.strip()
-    # Ultimate scanner: try different models and versions
+    last_res = "No models reached."
     for version in ["v1beta", "v1"]:
         for model in ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]:
             url = f"https://generativelanguage.googleapis.com/{version}/models/{model}:generateContent?key={api_key}"
@@ -34,10 +34,13 @@ def call_gemini_api(prompt, api_key):
                     elif "```" in res_text: res_text = res_text.split("```")[1].split("```")[0]
                     return res_text.strip()
                 else:
-                    time.sleep(1) # Small delay before retry
-            except:
+                    last_res = f"Error {response.status_code}: {response.text}"
+                    time.sleep(1)
+            except Exception as e:
+                last_res = str(e)
                 time.sleep(1)
                 continue
+    st.session_state['last_error'] = last_res
     return None
 
 def extract_text_from_pdf(pdf_file):
@@ -84,6 +87,8 @@ if uploaded_file is not None:
             claims = extract_claims(doc_text, api_key)
             if not claims:
                 st.info("Still searching for a compatible model... please wait 10 seconds and try one more time.")
+                if 'last_error' in st.session_state:
+                    st.error(f"Last Error: {st.session_state['last_error']}")
             else:
                 st.success(f"Connection Successful! Verifying {len(claims)} claims...")
                 col1, col2, col3, col4 = st.columns(4)
